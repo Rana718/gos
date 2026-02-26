@@ -1,10 +1,6 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
-*/
 package main
 
-import "gos/cmd"
+import "github.com/Rana718/gos/cmd"
 
 func main() {
 	cmd.Execute()

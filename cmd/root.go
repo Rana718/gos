@@ -1,39 +1,69 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+
+	"github.com/Rana718/gos/internal/config"
+	"github.com/Rana718/gos/internal/db"
 
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:     "gos",
-	Short:   "gos is a CLI tool to manage anthings",
-	Long:    `gos is a CLI tool to manage anything`,
-	Version: "0.1.0",
+	Short:   "gos - a fast CLI to manage paths, aliases, and more",
+	Long:    `gos is a CLI tool to manage paths, aliases, and more.`,
+	Version: "0.2.0",
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "@") {
+		aliasName := strings.TrimPrefix(os.Args[1], "@")
+		handleAlias(aliasName)
+		return
+	}
+
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+func handleAlias(name string) {
+	if name == "" {
+		fmt.Fprintln(os.Stderr, "Usage: gos @<alias_name>")
+		os.Exit(1)
+	}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.gos.yaml)")
+	if name == "config" {
+		config.OpenInEditor()
+		return
+	}
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	command, err := db.GetAlias(name)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unknown alias '@%s'. Use 'gos alias ls' to see aliases.\n", name)
+		os.Exit(1)
+	}
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/C", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	if err := cmd.Run(); err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitError.ExitCode())
+		}
+		fmt.Fprintf(os.Stderr, "Error running '@%s': %v\n", name, err)
+		os.Exit(1)
+	}
 }
